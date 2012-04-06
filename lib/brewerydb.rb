@@ -14,6 +14,37 @@ class BreweryDb
   default_params :format => 'JSON'
   @@apikey = nil
 
+  (class << self; self; end).instance_eval do
+    ["breweries", "beers", "styles", "categories"].each do |endpoint|
+      define_method endpoint do |*options|
+        options = options.first || { }
+        options.merge!({
+                         :key => apikey
+                       })
+
+        response = get("/#{endpoint}", :query => options)
+        if response.code == 200
+          Hashie::Mash.new(response['#{endpoint}'])
+        else
+          pp response
+        end
+      end
+      define_method endpoint.singularize do |id, *options|
+        options = options.first || { }
+        options.merge!({
+                         :key => apikey
+                       })
+        response = get("/#{endpoint}/#{id}", :query => options)
+        if response.code == 200
+          Hashie::Mash.new(response["#{endpoint}"]["#{endpoint.singularize}"])
+        else
+          pp request
+          pp response
+        end
+      end
+    end
+  end
+
   def self.search(options={})
     options.merge!({
       :apikey => apikey
@@ -21,78 +52,6 @@ class BreweryDb
 
     response = get("/search", :query => options)
     Hashie::Mash.new(response['results']) if response.code == 200
-  end
-
-  def self.breweries(options={})
-    options.merge!({
-      :apikey => apikey
-    })
-
-    response = get("/breweries", :query => options)
-    Hashie::Mash.new(response['breweries']) if response.code == 200
-  end
-
-  def self.brewery(id, options={})
-    options.merge!({
-      :apikey => apikey
-    })
-
-    response = get("/breweries/#{id}", :query => options)
-    Hashie::Mash.new(response['breweries']['brewery']) if response.code == 200
-  end
-
-  def self.beers(options={})
-    options.merge!({
-      :apikey => apikey
-    })
-
-    response = get("/beers", :query => options)
-    Hashie::Mash.new(response['beers']) if response.code == 200
-  end
-
-  def self.beer(id, options={})
-    options.merge!({
-      :apikey => apikey
-    })
-
-    response = get("/beers/#{id}", :query => options)
-    Hashie::Mash.new(response['beers']['beer']) if response.code == 200
-  end
-
-  def self.styles(options={})
-    options.merge!({
-      :apikey => apikey
-    })
-
-    response = get("/styles", :query => options)
-    Hashie::Mash.new(response['styles']) if response.code == 200
-  end
-
-  def self.style(id, options={})
-    options.merge!({
-      :apikey => apikey
-    })
-
-    response = get("/styles/#{id}", :query => options)
-    Hashie::Mash.new(response['styles']['style']) if response.code == 200
-  end
-
-  def self.categories(options={})
-    options.merge!({
-      :apikey => apikey
-    })
-
-    response = get("/categories", :query => options)
-    Hashie::Mash.new(response['categories']) if response.code == 200
-  end
-
-  def self.category(id, options={})
-    options.merge!({
-      :apikey => apikey
-    })
-
-    response = get("/categories/#{id}", :query => options)
-    Hashie::Mash.new(response['categories']['category']) if response.code == 200
   end
 
   def self.glassware(options={})
