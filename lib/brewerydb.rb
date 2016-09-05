@@ -2,87 +2,70 @@ require 'rubygems'
 require 'httparty'
 require 'hashie'
 
-#
-# BreweryDb.configure do |config|
-#   config.apikey = 'c0189f0299dd9333669a845b5ec14'
-# end
-#
+ #BreweryDb.configure do |config|
+ #  config.apikey = 'API_KEY'
+ #end
+ 
 class BreweryDb
   include HTTParty
-  base_uri 'http://www.brewerydb.com/api'
+  # debug_output $stdout
+  base_uri 'http://api.brewerydb.com/v2/'
   format :json
   default_params :format => 'JSON'
-  @@apikey = nil
 
-  (class << self; self; end).instance_eval do
-    ["breweries", "beers", "styles", "categories"].each do |endpoint|
+  class << self
+    
+    attr_accessor :apikey
+    
+    # plural endpoints
+    ["beers", "breweries", "categories", "events", "features", "fluidsizes", "guilds", "ingredients", "locations", "socialsites", "styles"].each do |endpoint|
       define_method endpoint do |*options|
-        options = options.first || { }
-        options.merge!({
-                         :key => apikey
-                       })
-
-        response = get("/#{endpoint}", :query => options)
-        if response.code == 200
-          Hashie::Mash.new(response['#{endpoint}'])
-        else
-          pp response
-        end
+        self.send_request("/#{endpoint}", options.first || {})
       end
+      
+      # singular endpoints
       define_method endpoint.singularize do |id, *options|
-        options = options.first || { }
-        options.merge!({
-                         :key => apikey
-                       })
-        response = get("/#{endpoint}/#{id}", :query => options)
-        if response.code == 200
-          Hashie::Mash.new(response["#{endpoint}"]["#{endpoint.singularize}"])
-        else
-          pp request
-          pp response
-        end
+        self.send_request("/#{endpoint.singularize}/#{id}", options.first || {})
+      end  
+    end
+    
+    # menu endpoints
+    # BreweryDb.menu_type (example BreweryDb.menu_styles)
+    # Hyphens in endpoints become underscores in method definition    
+    ["styles","categories","glassware","srm","beer-availability","fluidsize","beer-temperature","countries","ingredients","location-types","fluidsize-volume","event-types"].each do |type|
+      define_method "menu_#{type.gsub("-", "_")}" do |*options|
+        self.send_request("/menu/#{type}", options.first || {})
       end
+    end
+    
+    # search endpoints
+    # BreweryDb.search_type (example BreweryDb.search_geo_point)
+    # Hyphens in endpoints become underscores in method definition 
+    ["geo_point","upc"].each do |type|
+      define_method "search_#{type}" do |*options|
+        self.send_request("/search/#{type.gsub("_","/")}", options.first || {})
+      end
+    end
+    
+    # misc additional endpoints
+    def glass(id,options={});   send_request("/glassware/#{id}", options);  end
+    def glassware(options={});  send_request("/glassware", options);        end
+    def search(options={});     send_request("/search", options);           end
+    def convertid(options={});  send_request("/convertid", options);        end
+    def search;                 send_request('/search', options);           end
+    def heartbeat;              send_request("/heartbeat");                 end
+    def featured;               send_request("/featured");                  end
+    
+    
+    def send_request(endpoint, options={})
+      raise Exception.new('BreweryDb API Key not set') if !apikey
+      options.merge!({
+        :key => apikey
+      })
+      response = get(endpoint, :query => options)
+      Hashie::Mash.new(response)
     end
   end
 
-  def self.search(options={})
-    options.merge!({
-      :apikey => apikey
-    })
-
-    response = get("/search", :query => options)
-    Hashie::Mash.new(response['results']) if response.code == 200
-  end
-
-  def self.glassware(options={})
-    options.merge!({
-      :apikey => apikey
-    })
-
-    response = get("/glassware", :query => options)
-    Hashie::Mash.new(response['glassware']) if response.code == 200
-  end
-
-  def self.glass(id, options={})
-    options.merge!({
-      :apikey => apikey
-    })
-
-    response = get("/glassware/#{id}", :query => options)
-    Hashie::Mash.new(response['glassware']['glass']) if response.code == 200
-  end
-
-  def self.apikey
-    @@apikey
-  end
-
-  def self.apikey=(apikey)
-    @@apikey = apikey
-  end
-
-  def self.configure
-    yield self
-  end
-
+  def self.configure; yield self; end  
 end
-
